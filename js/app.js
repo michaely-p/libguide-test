@@ -169,25 +169,14 @@ function getInitials(name) {
 }
 
 function getAllSubjects(databases) {
-  const counts = new Map();
-  databases.forEach((db) => {
-    db.subjects.forEach((s) => {
-      counts.set(s, (counts.get(s) || 0) + 1);
-    });
-  });
-  return [...counts.entries()]
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([subject, count]) => ({ subject, count }));
+  const subjects = new Set();
+  databases.forEach((db) => db.subjects.forEach((s) => subjects.add(s)));
+  return [...subjects].sort((a, b) => a.localeCompare(b));
 }
 
-function getAllFunctions(databases) {
-  const counts = new Map();
-  databases.forEach((db) => {
-    counts.set(db.function, (counts.get(db.function) || 0) + 1);
-  });
-  return [...counts.entries()]
-    .sort((a, b) => getFunctionMeta(a[0]).order - getFunctionMeta(b[0]).order)
-    .map(([fn, count]) => ({ function: fn, count }));
+function truncate(str, max) {
+  if (str.length <= max) return str;
+  return `${str.slice(0, max).trimEnd()}…`;
 }
 
 function filterDatabases() {
@@ -227,9 +216,10 @@ const els = {
   databaseSections: document.getElementById('databaseSections'),
   emptyState: document.getElementById('emptyState'),
   subjectFilters: document.getElementById('subjectFilters'),
-  functionNav: document.getElementById('functionNav'),
-  resultCount: document.getElementById('resultCount'),
-  headerStats: document.getElementById('headerStats'),
+  filterToggle: document.getElementById('filterToggle'),
+  filterDropdown: document.getElementById('subjectFilterPanel'),
+  filterBadge: document.getElementById('filterBadge'),
+  filterWrap: document.getElementById('subjectFilterWrap'),
   searchInput: document.getElementById('searchInput'),
   selectAllBtn: document.getElementById('selectAllBtn'),
   clearAllBtn: document.getElementById('clearAllBtn'),
@@ -252,12 +242,11 @@ function renderSubjectFilters() {
   const subjects = getAllSubjects(state.databases);
   els.subjectFilters.innerHTML = subjects
     .map(
-      ({ subject, count }) => `
+      (subject) => `
     <label class="filter-chip ${state.selectedSubjects.has(subject) ? 'active' : ''}">
       <input type="checkbox" value="${escapeHtml(subject)}"
         ${state.selectedSubjects.has(subject) ? 'checked' : ''}>
       <span>${escapeHtml(subject)}</span>
-      <span class="chip-count">${count}</span>
     </label>`
     )
     .join('');
@@ -274,36 +263,31 @@ function renderSubjectFilters() {
   });
 }
 
-function renderFunctionNav(filtered) {
-  const groups = groupByFunction(filtered);
-  els.functionNav.innerHTML = groups
-    .map(({ function: fn, items }) => {
-      const meta = getFunctionMeta(fn);
-      return `
-    <li>
-      <a href="#section-${slugify(fn)}" class="function-link" style="--fn-color: ${meta.color}">
-        <span class="function-dot"></span>
-        <span class="function-link-text">${escapeHtml(fn)}</span>
-        <span class="function-count">${items.length}</span>
-      </a>
-    </li>`;
-    })
-    .join('');
+function updateFilterBadge() {
+  const count = state.selectedSubjects.size;
+  els.filterBadge.textContent = count;
+  els.filterBadge.classList.toggle('hidden', count === 0);
+  els.filterToggle.classList.toggle('is-active', count > 0);
 }
 
 function renderCard(db) {
   const meta = getFunctionMeta(db.function);
   const color = meta.color;
   return `
-    <article class="db-card" role="listitem" tabindex="0"
+    <article class="db-card" tabindex="0"
       data-name="${escapeHtml(db.name)}"
       style="--card-accent: ${color}"
-      aria-label="${escapeHtml(db.name)} details">
+      aria-label="View ${escapeHtml(db.name)} details">
       <div class="db-icon" style="background: linear-gradient(135deg, ${color}, ${adjustBrightness(color, -20)})">
         ${escapeHtml(getInitials(db.name))}
       </div>
-      <span class="db-name">${escapeHtml(db.name)}</span>
-      <span class="db-type-badge">${escapeHtml(db.type)}</span>
+      <div class="db-card-body">
+        <span class="db-name">${escapeHtml(db.name)}</span>
+        <span class="db-intro">${escapeHtml(truncate(db.intro, 72))}</span>
+      </div>
+      <svg class="db-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <path d="m9 18 6-6-6-6"/>
+      </svg>
     </article>`;
 }
 
@@ -334,18 +318,12 @@ function renderSections(filtered) {
     .map(({ function: fn, items }) => {
       const meta = getFunctionMeta(fn);
       return `
-    <section class="function-section" id="section-${slugify(fn)}" aria-label="${escapeHtml(fn)}">
-      <header class="function-header" style="--fn-color: ${meta.color}">
-        <div class="function-header-icon" aria-hidden="true">
-          <span class="function-header-bar"></span>
-        </div>
-        <div>
-          <h2 class="function-title">${escapeHtml(fn)}</h2>
-          <p class="function-desc">${escapeHtml(meta.description)}</p>
-        </div>
-        <span class="function-badge">${items.length} database${items.length !== 1 ? 's' : ''}</span>
+    <section class="function-section" id="section-${slugify(fn)}" aria-label="${escapeHtml(fn)}" style="--fn-color: ${meta.color}">
+      <header class="function-header">
+        <h2 class="function-title">${escapeHtml(fn)}</h2>
+        <p class="function-desc">${escapeHtml(meta.description)}</p>
       </header>
-      <div class="database-grid" role="list">
+      <div class="database-grid">
         ${items.map((db) => renderCard(db)).join('')}
       </div>
     </section>`;
@@ -357,13 +335,7 @@ function renderSections(filtered) {
 
 function render() {
   const filtered = filterDatabases();
-  const total = state.databases.length;
-  const functionCount = getAllFunctions(state.databases).length;
-
-  els.resultCount.textContent = `Showing ${filtered.length} of ${total} databases`;
-  els.headerStats.innerHTML = `<strong>${total}</strong> databases · <strong>${functionCount}</strong> functions · <strong>${getAllSubjects(state.databases).length}</strong> subjects`;
-
-  renderFunctionNav(filtered);
+  updateFilterBadge();
   renderSections(filtered);
   els.emptyState.classList.toggle('hidden', filtered.length > 0);
   els.databaseSections.classList.toggle('hidden', filtered.length === 0);
@@ -421,24 +393,33 @@ function adjustBrightness(hex, amount) {
 
 // ── Init ──
 
+function showLoadError(message) {
+  els.loading.classList.add('hidden');
+  els.errorMessage.textContent = message;
+  els.errorMessage.classList.remove('hidden');
+}
+
 async function init() {
   try {
     const response = await fetch(CSV_PATH);
-    if (!response.ok) throw new Error(`Failed to load CSV (HTTP ${response.status})`);
+    if (!response.ok) {
+      showLoadError(`Failed to load CSV (HTTP ${response.status}). Please open this page via an HTTP server or GitHub Pages.`);
+      return;
+    }
+
     const text = await response.text();
     state.databases = parseCSV(text);
 
     if (state.databases.length === 0) {
-      throw new Error('No data found in CSV file');
+      showLoadError('No data found in CSV file.');
+      return;
     }
 
     els.loading.classList.add('hidden');
     renderSubjectFilters();
     render();
   } catch (err) {
-    els.loading.classList.add('hidden');
-    els.errorMessage.textContent = `Failed to load: ${err.message}. Please open this page via an HTTP server or GitHub Pages.`;
-    els.errorMessage.classList.remove('hidden');
+    showLoadError(`Failed to load: ${err.message}. Please open this page via an HTTP server or GitHub Pages.`);
     console.error(err);
   }
 }
@@ -451,7 +432,7 @@ els.searchInput.addEventListener('input', (e) => {
 });
 
 els.selectAllBtn.addEventListener('click', () => {
-  getAllSubjects(state.databases).forEach(({ subject }) => {
+  getAllSubjects(state.databases).forEach((subject) => {
     state.selectedSubjects.add(subject);
   });
   renderSubjectFilters();
@@ -462,6 +443,20 @@ els.clearAllBtn.addEventListener('click', () => {
   state.selectedSubjects.clear();
   renderSubjectFilters();
   render();
+});
+
+els.filterToggle.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const isOpen = !els.filterDropdown.classList.contains('hidden');
+  els.filterDropdown.classList.toggle('hidden', isOpen);
+  els.filterToggle.setAttribute('aria-expanded', String(!isOpen));
+});
+
+document.addEventListener('click', (e) => {
+  if (!els.filterWrap.contains(e.target)) {
+    els.filterDropdown.classList.add('hidden');
+    els.filterToggle.setAttribute('aria-expanded', 'false');
+  }
 });
 
 els.modalClose.addEventListener('click', closeModal);
