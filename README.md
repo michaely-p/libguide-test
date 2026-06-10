@@ -1,17 +1,19 @@
 # Database Catalog
 
-A static webpage showcasing academic and research databases, powered by a CSV data file and deployable on GitHub Pages.
+A static webpage showcasing academic and research databases, powered by an Excel data file and deployable on GitHub Pages.
 
 ## Features
 
-- Loads database info from `data/databases.csv`
+- Loads database info from `data/databases.xlsx`
 - **Groups databases by function** (A&I, Find Articles, AI Tools, etc.)
 - Card grid within each function section (click icon for details)
 - Filter by related subjects (multi-select)
 - Keyword search (name, intro, type, function)
 - Detail modal with intro, features, coverage, and access link
 
-## CSV Column Format
+## Excel Column Format
+
+Edit `data/databases.xlsx` (first sheet). Column headers (row 1):
 
 | Column | Description | Separator |
 |--------|-------------|-----------|
@@ -22,14 +24,11 @@ A static webpage showcasing academic and research databases, powered by a CSV da
 | database type | Database type label | — |
 | related subjects | Related disciplines | pipe `\|` (multiple) |
 | access url | Access URL | — |
-| function | Display group (e.g. A&I, AI Tools) | — |
+| function | Display group (e.g. AI Research, Find Article) | — |
+| img | Logo image path (e.g. `/img/scopus.png`) | — |
+| sort | Display order within the same function (lower = first) | number |
 
-Example:
-
-```csv
-database name,intro,features,coverage,database type,related subjects,access url,function
-PubMed,Comprehensive biomedical literature database.,Citation search; MeSH indexing,35M+ citations,Literature & Citation,medicine|biology,https://pubmed.ncbi.nlm.nih.gov/,A&I
-```
+After editing the Excel file, run `scripts/update-databases.ps1` (with the file closed) to apply default img paths, sort values, and subject typo fixes in bulk.
 
 ### Function Groups
 
@@ -75,6 +74,6 @@ Open `http://localhost:8080` in your browser.
 ├── js/
 │   └── app.js
 ├── data/
-│   └── databases.csv
+│   └── databases.xlsx
 └── README.md
 ```
