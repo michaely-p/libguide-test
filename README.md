@@ -13,8 +13,6 @@ A static webpage showcasing academic and research databases, powered by a CSV da
 
 ## CSV Column Format
 
-Edit `data/databases.csv`. Column headers (row 1):
-
 | Column | Description | Separator |
 |--------|-------------|-----------|
 | database name | Database name | — |
@@ -24,9 +22,14 @@ Edit `data/databases.csv`. Column headers (row 1):
 | database type | Database type label | — |
 | related subjects | Related disciplines | pipe `\|` (multiple) |
 | access url | Access URL | — |
-| function | Display group (e.g. AI Research, Find Article) | — |
-| img | Logo image path (e.g. `/img/scopus.png`) | — |
-| sort | Display order within the same function (lower = first) | number |
+| function | Display group (e.g. A&I, AI Tools) | — |
+
+Example:
+
+```csv
+database name,intro,features,coverage,database type,related subjects,access url,function
+PubMed,Comprehensive biomedical literature database.,Citation search; MeSH indexing,35M+ citations,Literature & Citation,medicine|biology,https://pubmed.ncbi.nlm.nih.gov/,A&I
+```
 
 ### Function Groups
 
