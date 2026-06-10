@@ -63,8 +63,9 @@ Open `http://localhost:8080` in your browser.
 1. Create a GitHub repository and push this project
 2. Go to **Settings → Pages**
 3. Set **Source** to `Deploy from a branch`
-4. Choose branch `main`, folder `/ (root)`
-5. Access at `https://<username>.github.io/<repo>/` within a few minutes
+4. Choose branch `master` (or `main`), folder `/ (root)`
+5. Ensure `data/databases.csv` is committed and pushed (required for the site to load)
+6. Access at `https://<username>.github.io/<repo>/` within a few minutes
 
 ## Project Structure
 

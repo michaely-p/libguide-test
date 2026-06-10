@@ -1,4 +1,11 @@
-const DATA_PATH = 'data/databases.csv';
+/** Resolve paths for GitHub Pages project sites (e.g. /libguide-test/). */
+function assetUrl(path) {
+  if (!path) return '';
+  if (/^https?:\/\//i.test(path)) return path;
+  return new URL(path.replace(/^\//, ''), document.baseURI).href;
+}
+
+const DATA_PATH = assetUrl('data/databases.csv');
 
 const FUNCTION_META = {
   'AI Research': { color: '#a78bfa', order: 1 },
@@ -134,7 +141,7 @@ function toRecord(raw) {
       .filter(Boolean),
     url: raw['access url'],
     category: normalizeCategory(raw.function),
-    img: raw.img,
+    img: raw.img ? assetUrl(raw.img) : '',
     sort: Number.isFinite(sort) ? sort : 999,
   };
 }
