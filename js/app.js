@@ -1,418 +1,359 @@
-/** Resolve paths for GitHub Pages project sites (e.g. /libguide-test/). */
-function assetUrl(path) {
-  if (!path) return '';
-  if (/^https?:\/\//i.test(path)) return path;
-  return new URL(path.replace(/^\//, ''), document.baseURI).href;
+/* ── Config ─────────────────────────────────────────────────────────── */
+
+const DATA_URL = new URL('data/databases.csv', document.baseURI).href;
+
+/** Display groups: `name` is the canonical title; CSV `function` may use any listed alias. */
+const CATEGORIES = [
+  { name: 'AI Research Tool', color: '#7c6cf0', aliases: ['AI Tools'] },
+  { name: 'Find Book', color: '#38bdf8', aliases: ['Find Book'] },
+  { name: 'Find Article', color: '#3b6fd9', aliases: ['Find Article', 'Find Journal', 'A&I'] },
+  { name: 'Experiment Design', color: '#22c997' },
+  { name: 'Find Standard', color: '#f5a623', aliases: ['Find Standard'] },
+  { name: 'Find Patent', color: '#14b8a6', aliases: ['Find Patent'] },
+  { name: 'Publisher', color: '#ec4899' },
+];
+
+const DEFAULT_CATEGORY = { name: 'Other', color: '#94a3b8', order: 99 };
+
+/* ── Category registry (built once from CATEGORIES) ─────────────────── */
+
+const categoryLookup = new Map();
+const categoryMeta = new Map();
+
+CATEGORIES.forEach(({ name, color, aliases = [] }, order) => {
+  categoryMeta.set(name, { name, color, order });
+  categoryLookup.set(name, name);
+  aliases.forEach((alias) => categoryLookup.set(alias, name));
+});
+
+function normalizeCategory(raw) {
+  const key = raw?.trim();
+  if (!key) return DEFAULT_CATEGORY.name;
+  return categoryLookup.get(key) ?? DEFAULT_CATEGORY.name;
 }
 
-const DATA_PATH = assetUrl('data/databases.csv');
+function getCategory(name) {
+  return categoryMeta.get(name) ?? { ...DEFAULT_CATEGORY, name };
+}
 
-const FUNCTION_META = {
-  'AI Research': { color: '#a78bfa', order: 1 },
-  'Find Books': { color: '#38bdf8', order: 2 },
-  'Find Journals': { color: '#6c9eff', order: 3 },
-  'Experiment Design': { color: '#34d399', order: 4 },
-  'Find Standards': { color: '#fbbf24', order: 5 },
-  'Find Patents': { color: '#2dd4bf', order: 6 },
-  Publisher: { color: '#f472b6', order: 7 },
+/* ── State & DOM ────────────────────────────────────────────────────── */
+
+const state = {
+  databases: [],
+  selectedSubjects: new Set(),
+  searchQuery: '',
 };
 
-const FUNCTION_ALIASES = {
-  'Find Book': 'Find Books',
-  'Find Article': 'Find Journals',
-  'Find Articles': 'Find Journals',
-  'Find Journal': 'Find Journals',
-  'Find Standard': 'Find Standards',
-  'Find Patent': 'Find Patents',
-  'AI Tools': 'AI Research',
-};
-
-const state = { databases: [], selectedSubjects: new Set(), searchQuery: '' };
-
-const els = {
-  loading: document.getElementById('loading'),
-  errorMessage: document.getElementById('errorMessage'),
-  pageLayout: document.getElementById('pageLayout'),
-  databaseSections: document.getElementById('databaseSections'),
-  resultCount: document.getElementById('resultCount'),
-  emptyState: document.getElementById('emptyState'),
-  subjectFilters: document.getElementById('subjectFilters'),
-  searchInput: document.getElementById('searchInput'),
-  selectAllBtn: document.getElementById('selectAllBtn'),
-  clearAllBtn: document.getElementById('clearAllBtn'),
-  resetFiltersBtn: document.getElementById('resetFiltersBtn'),
-  modalOverlay: document.getElementById('modalOverlay'),
-  modalClose: document.getElementById('modalClose'),
+const ui = {
+  status: document.getElementById('status'),
+  catalog: document.getElementById('catalog'),
+  empty: document.getElementById('empty'),
+  subjects: document.getElementById('subjects'),
+  search: document.getElementById('search'),
+  clearSubjects: document.getElementById('clearSubjects'),
+  reset: document.getElementById('reset'),
+  detailModal: document.getElementById('detailModal'),
   modalIcon: document.getElementById('modalIcon'),
-  modalFunction: document.getElementById('modalFunction'),
+  modalCat: document.getElementById('modalCat'),
   modalTitle: document.getElementById('modalTitle'),
   modalIntro: document.getElementById('modalIntro'),
-  modalFeatures: document.getElementById('modalFeatures'),
-  modalCoverage: document.getElementById('modalCoverage'),
-  modalType: document.getElementById('modalType'),
-  modalSubjects: document.getElementById('modalSubjects'),
-  modalAccessBtn: document.getElementById('modalAccessBtn'),
+  modalTags: document.getElementById('modalTags'),
+  modalLink: document.getElementById('modalLink'),
 };
 
-const esc = (s) => String(s)
-  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+let bootstrapModal;
 
-const normalizeCategory = (value) => FUNCTION_ALIASES[value?.trim()] || value?.trim() || 'Other';
+const esc = (value) => String(value)
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;');
 
-const fnMeta = (fn) => FUNCTION_META[fn] || { color: '#8b92a5', order: 99 };
+const resolveAssetUrl = (path) => (
+  path && !/^https?:\/\//i.test(path)
+    ? new URL(path.replace(/^\//, ''), document.baseURI).href
+    : path
+);
 
-const initials = (name) => name.split(/[\s-]+/).slice(0, 2).map((w) => w[0]?.toUpperCase() || '').join('');
+/* ── CSV parsing ────────────────────────────────────────────────────── */
 
-function detectDelimiter(headerLine) {
-  const commas = (headerLine.match(/,/g) || []).length;
-  const semicolons = (headerLine.match(/;/g) || []).length;
-  const tabs = (headerLine.match(/\t/g) || []).length;
-  if (tabs >= commas && tabs >= semicolons && tabs > 0) return '\t';
-  return semicolons > commas ? ';' : ',';
-}
-
-function splitDelimitedLine(line, delimiter = ',') {
+function splitCsvLine(line) {
   const fields = [];
   let current = '';
   let inQuotes = false;
 
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (ch === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        current += '"';
-        i++;
-      } else {
-        inQuotes = !inQuotes;
-      }
-    } else if (ch === delimiter && !inQuotes) {
-      fields.push(current);
-      current = '';
-    } else {
-      current += ch;
-    }
+  for (const char of line) {
+    if (char === '"') { inQuotes = !inQuotes; continue; }
+    if (char === ',' && !inQuotes) { fields.push(current.trim()); current = ''; continue; }
+    current += char;
   }
-  fields.push(current);
+
+  fields.push(current.trim());
   return fields;
 }
 
-const ROW_TAIL_RE = /,(|https?:\/\/[^,\r\n]*),([^,\r\n]+),(|\/[^,\r\n]*),(\d+)\s*$/;
+function parseCsvRows(text) {
+  const rows = [];
+  let currentRow = '';
+  let inQuotes = false;
 
-function parseHeadFields(rest, delimiter) {
-  const fields = splitDelimitedLine(rest, delimiter);
-  if (fields.length === 6) {
-    const [name, intro, features, coverage, type, subjects] = fields;
-    return { name, intro, features, coverage, type, subjects };
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === '"') { inQuotes = !inQuotes; currentRow += char; continue; }
+    if ((char === '\n' || char === '\r') && !inQuotes) {
+      if (char === '\r' && text[i + 1] === '\n') i++;
+      if (currentRow) rows.push(currentRow);
+      currentRow = '';
+      continue;
+    }
+    currentRow += char;
   }
-  if (fields.length < 6) return null;
 
-  const subjects = fields.at(-1);
-  const type = fields.at(-2);
-  const coverage = fields.at(-3);
-  const name = fields[0];
-  const intro = fields[1];
-  const features = fields.slice(2, -3).join(delimiter);
-  return { name, intro, features, coverage, type, subjects };
+  if (currentRow) rows.push(currentRow);
+  return rows;
 }
 
-function parseDatabaseLine(line, delimiter) {
-  const tail = line.match(ROW_TAIL_RE);
-  if (!tail) return splitDelimitedLine(line, delimiter);
+function rowToDatabase(headers, values) {
+  const record = Object.fromEntries(headers.map((header, index) => [header, values[index] || '']));
+  const name = record['database name'];
+  if (!name) return null;
 
-  const [, url, category, img, sort] = tail;
-  const rest = line.slice(0, line.length - tail[0].length);
-  const head = parseHeadFields(rest, delimiter);
-  if (!head) return splitDelimitedLine(line, delimiter);
+  const sort = parseInt(record.sort, 10);
 
-  return [head.name, head.intro, head.features, head.coverage, head.type, head.subjects, url, category, img, sort];
-}
-
-function toRecord(raw) {
-  const sort = parseInt(raw.sort, 10);
   return {
-    name: raw['database name'],
-    intro: raw.intro,
-    features: (raw.features || '').split(';').map((f) => f.trim()).filter(Boolean),
-    coverage: raw.coverage,
-    type: raw['database type'] || raw['databse type'],
-    subjects: (raw['related subjects'] || '')
-      .split('|')
-      .map((s) => s.trim().replace('Physics and MateriaLife Sciences', 'Physics and Materials Science'))
-      .filter(Boolean),
-    url: raw['access url'],
-    category: normalizeCategory(raw.function),
-    img: raw.img ? assetUrl(raw.img) : '',
+    name,
+    intro: record.intro,
+    type: record['database type'],
+    subjects: record['related subjects'].split('|').map((s) => s.trim()).filter(Boolean),
+    url: record['access url'],
+    category: normalizeCategory(record.function),
+    img: resolveAssetUrl(record.img),
     sort: Number.isFinite(sort) ? sort : 999,
   };
 }
 
-function normalizeCsvText(text) {
-  return text
-    .replace(/^\uFEFF/, '')
-    .replace(/[\u201C\u201D\u201E\u2033\u2036]/g, '"');
-}
-
 function parseCsv(text) {
-  const content = normalizeCsvText(text);
-  const lines = [];
-  let current = '';
-  let inQuotes = false;
+  const rows = parseCsvRows(text.replace(/^\uFEFF/, ''));
+  if (rows.length < 2) return [];
 
-  for (let i = 0; i < content.length; i++) {
-    const ch = content[i];
-    if (ch === '"') {
-      if (inQuotes && content[i + 1] === '"') {
-        current += '"';
-        i++;
-      } else {
-        inQuotes = !inQuotes;
-      }
-    } else if ((ch === '\n' || ch === '\r') && !inQuotes) {
-      if (ch === '\r' && content[i + 1] === '\n') i++;
-      lines.push(current);
-      current = '';
-    } else {
-      current += ch;
-    }
-  }
-  if (current) lines.push(current);
-  if (lines.length < 2) return [];
+  const headers = splitCsvLine(rows[0]).map((header) => header.toLowerCase());
 
-  const delimiter = detectDelimiter(lines[0]);
-  const headers = splitDelimitedLine(lines[0], delimiter).map((h) => h.trim().toLowerCase());
-  const rows = [];
-
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-    const values = parseDatabaseLine(line, delimiter).map((v) => v.trim());
-    if (values.length !== headers.length) {
-      console.warn(`CSV row ${i + 1}: got ${values.length} fields, expected ${headers.length}`, values);
-    }
-    const raw = {};
-    headers.forEach((header, idx) => {
-      raw[header] = values[idx] || '';
-    });
-    const record = toRecord(raw);
-    if (record.name) rows.push(record);
-  }
-
-  return rows;
-}
-
-function getFiltered() {
-  return state.databases.filter((db) => {
-    const q = state.searchQuery;
-    const matchesSearch = !q || [db.name, db.intro, db.type, db.category]
-      .some((field) => field.toLowerCase().includes(q));
-    const matchesSubject = !state.selectedSubjects.size
-      || db.subjects.some((s) => state.selectedSubjects.has(s));
-    return matchesSearch && matchesSubject;
+  return rows.slice(1).flatMap((row) => {
+    const line = row.trim();
+    if (!line) return [];
+    const database = rowToDatabase(headers, splitCsvLine(line));
+    return database ? [database] : [];
   });
 }
 
-function groupByFunction(databases) {
+/* ── Filtering & grouping ───────────────────────────────────────────── */
+
+function matchesSearch(db) {
+  if (!state.searchQuery) return true;
+  return [db.name, db.intro, db.type, db.category]
+    .some((field) => field.toLowerCase().includes(state.searchQuery));
+}
+
+function matchesSubjects(db) {
+  if (!state.selectedSubjects.size) return true;
+  return db.subjects.some((subject) => state.selectedSubjects.has(subject));
+}
+
+function getVisibleDatabases() {
+  return state.databases.filter((db) => matchesSearch(db) && matchesSubjects(db));
+}
+
+function groupByCategory(databases) {
   const groups = new Map();
+
   databases.forEach((db) => {
     if (!groups.has(db.category)) groups.set(db.category, []);
     groups.get(db.category).push(db);
   });
 
   return [...groups.entries()]
-    .sort((a, b) => fnMeta(a[0]).order - fnMeta(b[0]).order)
+    .sort(([a], [b]) => getCategory(a).order - getCategory(b).order)
     .map(([category, items]) => ({
       category,
       items: items.sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name)),
     }));
 }
 
-function iconHtml(db, className = 'db-icon') {
-  const { color } = fnMeta(db.category);
-  if (db.img) {
-    return `<div class="${className} ${className}--img" aria-hidden="true"><img src="${esc(db.img)}" alt="" loading="lazy" decoding="async"></div>`;
-  }
-  return `<div class="${className}" style="background:${color}" aria-hidden="true">${esc(initials(db.name))}</div>`;
+function findDatabase(name) {
+  return state.databases.find((db) => db.name === name);
 }
 
-function fallbackIcon(img) {
-  const name = img.closest('.db-card')?.dataset.name || els.modalTitle.textContent;
-  const db = state.databases.find((d) => d.name === name);
+/* ── View helpers ───────────────────────────────────────────────────── */
+
+function initials(name) {
+  return name.split(/[\s-]+/).slice(0, 2).map((word) => word[0]?.toUpperCase() || '').join('');
+}
+
+const ICON_BASE = 'd-flex align-items-center justify-content-center flex-shrink-0 text-white fw-bold rounded-3';
+
+function iconClasses(large) {
+  return large ? `${ICON_BASE} db-icon db-icon-lg fs-6` : `${ICON_BASE} db-icon fs-5`;
+}
+
+function renderIcon(db, large = false) {
+  const { color } = getCategory(db.category);
+  const cls = iconClasses(large);
+
+  if (db.img) {
+    return `<div class="${cls} bg-white border p-2"><img src="${esc(db.img)}" alt="" class="w-100 h-100 object-fit-contain"></div>`;
+  }
+
+  return `<div class="${cls}" style="background:${color}">${esc(initials(db.name))}</div>`;
+}
+
+function renderDatabaseCard(db) {
+  return `
+    <div class="col">
+      <button type="button" class="btn border-0 bg-transparent d-flex flex-column align-items-center gap-2 py-2 px-2 w-100" data-name="${esc(db.name)}">
+        ${renderIcon(db)}
+        <span class="small fw-semibold text-center lh-sm db-title-clamp">${esc(db.name)}</span>
+      </button>
+    </div>`;
+}
+
+function renderCategorySection({ category, items }) {
+  const { color } = getCategory(category);
+
+  return `
+    <section class="card mb-4 shadow-sm border-0 overflow-hidden">
+      <div class="card-header border-start border-4 py-3" style="border-left-color:${color};background:color-mix(in srgb, ${color} 8%, #fff)">
+        <h2 class="h5 fw-bold mb-0">${esc(category)}</h2>
+      </div>
+      <div class="card-body">
+        <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 row-cols-xl-6 g-2">
+          ${items.map(renderDatabaseCard).join('')}
+        </div>
+      </div>
+    </section>`;
+}
+
+function replaceBrokenIcon(img) {
+  const name = img.closest('[data-name]')?.dataset.name || ui.modalTitle.textContent;
+  const db = findDatabase(name);
   if (!db) return;
 
-  const box = img.parentElement;
-  box.className = box.className.replace(/\s*\S+--img/g, '').trim();
-  box.style.background = fnMeta(db.category).color;
-  box.textContent = initials(db.name);
+  const fallback = document.createElement('div');
+  fallback.className = iconClasses(!!img.closest('.db-icon-lg'));
+  fallback.style.background = getCategory(db.category).color;
+  fallback.textContent = initials(db.name);
+  img.parentElement.replaceWith(fallback);
 }
 
-function renderFilters() {
+/* ── Render ─────────────────────────────────────────────────────────── */
+
+function renderSubjectFilters() {
   const subjects = [...new Set(state.databases.flatMap((db) => db.subjects))].sort();
-  els.subjectFilters.innerHTML = subjects.map((subject) => `
-    <label class="filter-chip ${state.selectedSubjects.has(subject) ? 'active' : ''}">
-      <input type="checkbox" value="${esc(subject)}" ${state.selectedSubjects.has(subject) ? 'checked' : ''}>
-      <span>${esc(subject)}</span>
-    </label>`).join('');
+
+  ui.subjects.innerHTML = subjects.map((subject, index) => `
+    <div class="form-check py-1">
+      <input class="form-check-input" type="checkbox" value="${esc(subject)}" id="sub-${index}"${state.selectedSubjects.has(subject) ? ' checked' : ''}>
+      <label class="form-check-label small" for="sub-${index}">${esc(subject)}</label>
+    </div>`).join('');
 }
 
-function render() {
-  const filtered = getFiltered();
-  const groups = groupByFunction(filtered);
+function renderCatalog() {
+  const visible = getVisibleDatabases();
+  const sections = groupByCategory(visible);
 
-  els.databaseSections.innerHTML = groups.map(({ category, items }) => {
-    const { color } = fnMeta(category);
-    const cards = items.map((db) => `
-      <article class="db-card" tabindex="0" data-name="${esc(db.name)}"
-        style="--card-accent:${color}" aria-label="View ${esc(db.name)} details">
-        ${iconHtml(db)}
-        <span class="db-name">${esc(db.name)}</span>
-      </article>`).join('');
-
-    return `
-      <section class="function-section" style="--fn-color:${color}">
-        <header class="function-header">
-          <h2 class="function-title">${esc(category)}</h2>
-          <span class="function-count">${items.length}</span>
-        </header>
-        <div class="database-grid">${cards}</div>
-      </section>`;
-  }).join('');
-
-  const total = state.databases.length;
-  if (els.resultCount) {
-    els.resultCount.textContent = filtered.length === total
-      ? `${total} databases`
-      : `Showing ${filtered.length} of ${total} databases`;
-  }
-
-  els.emptyState.classList.toggle('hidden', filtered.length > 0);
-  els.databaseSections.classList.toggle('hidden', filtered.length === 0);
+  ui.catalog.innerHTML = sections.map(renderCategorySection).join('');
+  ui.empty.classList.toggle('d-none', visible.length > 0);
+  ui.catalog.classList.toggle('d-none', visible.length === 0);
+  ui.status.classList.add('d-none');
 }
 
-function openModal(db) {
-  els.modalIcon.innerHTML = db.img
-    ? `<img src="${esc(db.img)}" alt="" decoding="async">`
-    : '';
-  els.modalIcon.className = db.img ? 'modal-icon modal-icon--img' : 'modal-icon';
-  els.modalIcon.style.background = db.img ? '' : fnMeta(db.category).color;
-  if (!db.img) els.modalIcon.textContent = initials(db.name);
-
-  const img = els.modalIcon.querySelector('img');
-  if (img) img.onerror = () => fallbackIcon(img);
-
-  els.modalFunction.textContent = db.category;
-  els.modalFunction.style.color = fnMeta(db.category).color;
-  els.modalTitle.textContent = db.name;
-  els.modalIntro.textContent = db.intro;
-  els.modalCoverage.textContent = db.coverage;
-  els.modalType.textContent = db.type;
-  els.modalFeatures.innerHTML = db.features.map((f) => `<li>${esc(f)}</li>`).join('');
-  els.modalSubjects.innerHTML = db.subjects.map((s) => `<span class="tag">${esc(s)}</span>`).join('');
-  els.modalAccessBtn.href = db.url || '#';
-  els.modalAccessBtn.classList.toggle('hidden', !db.url);
-
-  els.modalOverlay.classList.remove('hidden');
-  els.modalOverlay.setAttribute('aria-hidden', 'false');
-  document.body.style.overflow = 'hidden';
-  els.modalClose.focus();
+function renderAll() {
+  renderSubjectFilters();
+  renderCatalog();
 }
 
-function closeModal() {
-  els.modalOverlay.classList.add('hidden');
-  els.modalOverlay.setAttribute('aria-hidden', 'true');
-  document.body.style.overflow = '';
+function openDatabaseModal(name) {
+  const db = findDatabase(name);
+  if (!db) return;
+
+  const { color } = getCategory(db.category);
+
+  ui.modalIcon.innerHTML = renderIcon(db, true);
+  ui.modalCat.textContent = db.category;
+  ui.modalCat.style.color = color;
+  ui.modalTitle.textContent = db.name;
+  ui.modalIntro.textContent = db.intro;
+  ui.modalTags.innerHTML = db.subjects
+    .map((subject) => `<span class="badge bg-primary-subtle text-primary-emphasis">${esc(subject)}</span>`)
+    .join('');
+  ui.modalLink.href = db.url;
+  ui.modalLink.classList.toggle('d-none', !db.url);
+
+  (bootstrapModal ??= new bootstrap.Modal(ui.detailModal)).show();
 }
-
-function showError(message) {
-  els.loading.classList.add('hidden');
-  els.errorMessage.textContent = message;
-  els.errorMessage.classList.remove('hidden');
-}
-
-async function init() {
-  try {
-    const res = await fetch(DATA_PATH);
-    if (!res.ok) {
-      showError(`Failed to load CSV file (HTTP ${res.status}). Open via an HTTP server or GitHub Pages.`);
-      return;
-    }
-
-    state.databases = parseCsv(await res.text());
-    if (!state.databases.length) {
-      showError('No data found in CSV file.');
-      return;
-    }
-
-  } catch (err) {
-    showError(`Failed to load: ${err.message}. Open via an HTTP server or GitHub Pages.`);
-    console.error(err);
-    return;
-  }
-
-  els.loading.classList.add('hidden');
-  els.pageLayout?.classList.remove('hidden');
-  renderFilters();
-  render();
-}
-
-els.searchInput?.addEventListener('input', (e) => {
-  state.searchQuery = e.target.value.trim().toLowerCase();
-  render();
-});
-
-els.subjectFilters?.addEventListener('change', (e) => {
-  if (e.target.type !== 'checkbox') return;
-  if (e.target.checked) state.selectedSubjects.add(e.target.value);
-  else state.selectedSubjects.delete(e.target.value);
-  renderFilters();
-  render();
-});
-
-els.selectAllBtn?.addEventListener('click', () => {
-  state.databases.flatMap((db) => db.subjects).forEach((s) => state.selectedSubjects.add(s));
-  renderFilters();
-  render();
-});
-
-els.clearAllBtn?.addEventListener('click', () => {
-  state.selectedSubjects.clear();
-  renderFilters();
-  render();
-});
 
 function resetFilters() {
   state.selectedSubjects.clear();
   state.searchQuery = '';
-  if (els.searchInput) els.searchInput.value = '';
-  renderFilters();
-  render();
+  ui.search.value = '';
+  renderAll();
 }
 
-els.resetFiltersBtn?.addEventListener('click', resetFilters);
+function showLoadError(message) {
+  ui.status.textContent = message;
+}
 
-els.databaseSections?.addEventListener('click', (e) => {
-  const card = e.target.closest('.db-card');
-  if (!card) return;
-  const db = state.databases.find((d) => d.name === card.dataset.name);
-  if (db) openModal(db);
-});
+/* ── Data loading ───────────────────────────────────────────────────── */
 
-els.databaseSections?.addEventListener('keydown', (e) => {
-  if (e.key !== 'Enter' && e.key !== ' ') return;
-  const card = e.target.closest('.db-card');
-  if (!card) return;
-  e.preventDefault();
-  const db = state.databases.find((d) => d.name === card.dataset.name);
-  if (db) openModal(db);
-});
+async function loadDatabases() {
+  const response = await fetch(DATA_URL);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-els.databaseSections?.addEventListener('error', (e) => {
-  if (e.target.tagName === 'IMG') fallbackIcon(e.target);
-}, true);
+  const databases = parseCsv(await response.text());
+  if (!databases.length) throw new Error('Empty CSV');
 
-els.modalClose?.addEventListener('click', closeModal);
-els.modalOverlay?.addEventListener('click', (e) => { if (e.target === els.modalOverlay) closeModal(); });
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !els.modalOverlay.classList.contains('hidden')) closeModal();
-});
+  state.databases = databases;
+}
 
+/* ── Events ─────────────────────────────────────────────────────────── */
+
+function bindEvents() {
+  ui.search.addEventListener('input', (event) => {
+    state.searchQuery = event.target.value.trim().toLowerCase();
+    renderCatalog();
+  });
+
+  ui.subjects.addEventListener('change', (event) => {
+    if (event.target.type !== 'checkbox') return;
+    if (event.target.checked) state.selectedSubjects.add(event.target.value);
+    else state.selectedSubjects.delete(event.target.value);
+    renderCatalog();
+  });
+
+  ui.clearSubjects.addEventListener('click', () => {
+    state.selectedSubjects.clear();
+    renderAll();
+  });
+
+  ui.reset.addEventListener('click', resetFilters);
+
+  ui.catalog.addEventListener('click', (event) => {
+    const card = event.target.closest('[data-name]');
+    if (card?.dataset.name) openDatabaseModal(card.dataset.name);
+  });
+
+  document.addEventListener('error', (event) => {
+    if (event.target.tagName === 'IMG') replaceBrokenIcon(event.target);
+  }, true);
+}
+
+async function init() {
+  try {
+    await loadDatabases();
+    renderAll();
+  } catch (error) {
+    showLoadError(`Failed to load data: ${error.message}`);
+  }
+}
+
+bindEvents();
 init();
