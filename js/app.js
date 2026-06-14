@@ -206,30 +206,41 @@ function renderIcon(db, large = false) {
   return `<div class="${cls}" style="background:${color}">${esc(initials(db.name))}</div>`;
 }
 
+function categoryTextColor(hex) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.62 ? '#1e293b' : '#ffffff';
+}
+
 function renderDatabaseCard(db) {
   return `
     <div class="col">
-      <button type="button" class="btn border-0 bg-transparent d-flex flex-column align-items-center gap-2 py-2 px-2 w-100" data-name="${esc(db.name)}">
+      <button type="button" class="btn border-0 bg-transparent d-flex flex-column align-items-center gap-1 py-1 px-1 w-100" data-name="${esc(db.name)}">
         ${renderIcon(db)}
-        <span class="small fw-semibold text-center lh-sm db-title-clamp">${esc(db.name)}</span>
+        <span class="fw-semibold text-center lh-sm text-break db-title w-100">${esc(db.name)}</span>
       </button>
     </div>`;
 }
 
 function renderCategorySection({ category, items }) {
   const { color } = getCategory(category);
+  const textColor = categoryTextColor(color);
 
   return `
-    <section class="card mb-4 shadow-sm border-0 overflow-hidden">
-      <div class="card-header border-start border-4 py-3" style="border-left-color:${color};background:color-mix(in srgb, ${color} 8%, #fff)">
-        <h2 class="h5 fw-bold mb-0">${esc(category)}</h2>
-      </div>
-      <div class="card-body">
-        <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 row-cols-xl-6 g-2">
-          ${items.map(renderDatabaseCard).join('')}
+    <div class="col">
+      <section class="card category-card h-100 border-0 overflow-hidden" style="--cat:${color}">
+        <div class="category-card-header d-flex align-items-center justify-content-between gap-2 px-3 py-2" style="background:${color};color:${textColor}">
+          <h2 class="h6 fw-bold mb-0">${esc(category)}</h2>
+          <span class="badge rounded-pill category-card-count" style="background:color-mix(in srgb, ${textColor} 16%, transparent)">${items.length}</span>
         </div>
-      </div>
-    </section>`;
+        <div class="card-body p-2 category-card-body">
+          <div class="row row-cols-3 g-1">
+            ${items.map(renderDatabaseCard).join('')}
+          </div>
+        </div>
+      </section>
+    </div>`;
 }
 
 function replaceBrokenIcon(img) {
