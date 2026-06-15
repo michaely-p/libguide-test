@@ -44,28 +44,6 @@ PubMed,Comprehensive biomedical literature database.,Citation search; MeSH index
 | Geographic Data | Geospatial and place-name data |
 | Clinical Trials | Clinical study registries |
 
-## Local Preview
-
-Requires a local HTTP server (opening `index.html` directly will fail due to browser CORS restrictions):
-
-```bash
-# Python 3
-python -m http.server 8080
-
-# Node.js
-npx serve .
-```
-
-Open `http://localhost:8080` in your browser.
-
-## Deploy to GitHub Pages
-
-1. Create a GitHub repository and push this project
-2. Go to **Settings → Pages**
-3. Set **Source** to `Deploy from a branch`
-4. Choose branch `master` (or `main`), folder `/ (root)`
-5. Ensure `data/databases.csv` is committed and pushed (required for the site to load)
-6. Access at `https://<username>.github.io/<repo>/` within a few minutes
 
 ## Project Structure
 
