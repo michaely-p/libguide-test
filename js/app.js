@@ -10,6 +10,7 @@ const CATEGORIES = [
   { name: 'Experiment Design', color: '#22c997' },
   { name: 'Find Standard', color: '#f5a623', aliases: ['Find Standard'] },
   { name: 'Find Patent', color: '#14b8a6', aliases: ['Find Patent'] },
+  { name: 'Find Theses', color: '#141cb8', aliases: ['Find Theses'] },
   { name: 'Publisher', color: '#ec4899' },
 ];
 
@@ -42,6 +43,8 @@ const state = {
   databases: [],
   selectedSubjects: new Set(),
   searchQuery: '',
+  librarySupportedOnly: false,
+  aiFeaturedOnly: false,
 };
 
 const ui = {
@@ -51,6 +54,8 @@ const ui = {
   subjects: document.getElementById('subjects'),
   search: document.getElementById('search'),
   clearSubjects: document.getElementById('clearSubjects'),
+  librarySupported: document.getElementById('librarySupported'),
+  aiFeatured: document.getElementById('aiFeatured'),
   reset: document.getElementById('reset'),
   detailModal: document.getElementById('detailModal'),
   modalIcon: document.getElementById('modalIcon'),
@@ -128,6 +133,8 @@ function rowToDatabase(headers, values) {
     url: record['access url'],
     category: normalizeCategory(record.function),
     img: resolveAssetUrl(record.img),
+    openResource: record.open_resource.trim().toLowerCase() === 'y',
+    aiFeature: record.ai_feature.trim().toLowerCase() === 'y',
     sort: Number.isFinite(sort) ? sort : 999,
   };
 }
@@ -159,8 +166,23 @@ function matchesSubjects(db) {
   return db.subjects.some((subject) => state.selectedSubjects.has(subject));
 }
 
+function matchesLibrarySupported(db) {
+  if (!state.librarySupportedOnly) return true;
+  return !db.openResource;
+}
+
+function matchesAiFeatured(db) {
+  if (!state.aiFeaturedOnly) return true;
+  return db.aiFeature;
+}
+
 function getVisibleDatabases() {
-  return state.databases.filter((db) => matchesSearch(db) && matchesSubjects(db));
+  return state.databases.filter(
+    (db) => matchesSearch(db)
+      && matchesSubjects(db)
+      && matchesLibrarySupported(db)
+      && matchesAiFeatured(db),
+  );
 }
 
 function groupByCategory(databases) {
@@ -305,7 +327,11 @@ function openDatabaseModal(name) {
 function resetFilters() {
   state.selectedSubjects.clear();
   state.searchQuery = '';
+  state.librarySupportedOnly = false;
+  state.aiFeaturedOnly = false;
   ui.search.value = '';
+  ui.librarySupported.checked = false;
+  ui.aiFeatured.checked = false;
   renderAll();
 }
 
@@ -343,6 +369,16 @@ function bindEvents() {
   ui.clearSubjects.addEventListener('click', () => {
     state.selectedSubjects.clear();
     renderAll();
+  });
+
+  ui.librarySupported.addEventListener('change', (event) => {
+    state.librarySupportedOnly = event.target.checked;
+    renderCatalog();
+  });
+
+  ui.aiFeatured.addEventListener('change', (event) => {
+    state.aiFeaturedOnly = event.target.checked;
+    renderCatalog();
   });
 
   ui.reset.addEventListener('click', resetFilters);
