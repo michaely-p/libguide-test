@@ -44,7 +44,8 @@ const state = {
   selectedSubjects: new Set(),
   searchQuery: '',
   librarySupportedOnly: false,
-  aiFeaturedOnly: false,
+  freeResourcesOnly: false,
+  aiFeaturesOnly: false,
 };
 
 const ui = {
@@ -55,7 +56,8 @@ const ui = {
   search: document.getElementById('search'),
   clearSubjects: document.getElementById('clearSubjects'),
   librarySupported: document.getElementById('librarySupported'),
-  aiFeatured: document.getElementById('aiFeatured'),
+  freeResources: document.getElementById('freeResources'),
+  aiFeatures: document.getElementById('aiFeatures'),
   reset: document.getElementById('reset'),
   detailModal: document.getElementById('detailModal'),
   modalIcon: document.getElementById('modalIcon'),
@@ -165,13 +167,20 @@ function matchesSubjects(db) {
   return db.subjects.some((subject) => state.selectedSubjects.has(subject));
 }
 
-function matchesLibrarySupported(db) {
-  if (!state.librarySupportedOnly) return true;
-  return !db.openResource;
+function matchesAccessType(db) {
+  const { librarySupportedOnly, freeResourcesOnly } = state;
+  if (!librarySupportedOnly && !freeResourcesOnly) return true;
+
+  const isLibrarySupported = !db.openResource;
+  const isFreeResource = db.openResource;
+
+  if (librarySupportedOnly && isLibrarySupported) return true;
+  if (freeResourcesOnly && isFreeResource) return true;
+  return false;
 }
 
-function matchesAiFeatured(db) {
-  if (!state.aiFeaturedOnly) return true;
+function matchesAiFeatures(db) {
+  if (!state.aiFeaturesOnly) return true;
   return db.aiFeature;
 }
 
@@ -179,8 +188,8 @@ function getVisibleDatabases() {
   return state.databases.filter(
     (db) => matchesSearch(db)
       && matchesSubjects(db)
-      && matchesLibrarySupported(db)
-      && matchesAiFeatured(db),
+      && matchesAccessType(db)
+      && matchesAiFeatures(db),
   );
 }
 
@@ -327,10 +336,12 @@ function resetFilters() {
   state.selectedSubjects.clear();
   state.searchQuery = '';
   state.librarySupportedOnly = false;
-  state.aiFeaturedOnly = false;
+  state.freeResourcesOnly = false;
+  state.aiFeaturesOnly = false;
   ui.search.value = '';
   ui.librarySupported.checked = false;
-  ui.aiFeatured.checked = false;
+  ui.freeResources.checked = false;
+  ui.aiFeatures.checked = false;
   renderAll();
 }
 
@@ -375,8 +386,13 @@ function bindEvents() {
     renderCatalog();
   });
 
-  ui.aiFeatured.addEventListener('change', (event) => {
-    state.aiFeaturedOnly = event.target.checked;
+  ui.freeResources.addEventListener('change', (event) => {
+    state.freeResourcesOnly = event.target.checked;
+    renderCatalog();
+  });
+
+  ui.aiFeatures.addEventListener('change', (event) => {
+    state.aiFeaturesOnly = event.target.checked;
     renderCatalog();
   });
 
