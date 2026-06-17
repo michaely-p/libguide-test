@@ -157,8 +157,7 @@ function parseCsv(text) {
 
 function matchesSearch(db) {
   if (!state.searchQuery) return true;
-  return [db.name, db.intro, db.type, db.category]
-    .some((field) => field.toLowerCase().includes(state.searchQuery));
+  return db.name.toLowerCase().includes(state.searchQuery);
 }
 
 function matchesSubjects(db) {
