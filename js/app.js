@@ -46,6 +46,7 @@ const state = {
   librarySupportedOnly: false,
   freeResourcesOnly: false,
   aiFeaturesOnly: false,
+  traditionalOnly: false,
 };
 
 const ui = {
@@ -58,6 +59,8 @@ const ui = {
   librarySupported: document.getElementById('librarySupported'),
   freeResources: document.getElementById('freeResources'),
   aiFeatures: document.getElementById('aiFeatures'),
+  traditional: document.getElementById('traditional'),
+  filterReset: document.getElementById('filterReset'),
   reset: document.getElementById('reset'),
   detailModal: document.getElementById('detailModal'),
   modalIcon: document.getElementById('modalIcon'),
@@ -179,9 +182,13 @@ function matchesAccessType(db) {
   return false;
 }
 
-function matchesAiFeatures(db) {
-  if (!state.aiFeaturesOnly) return true;
-  return db.aiFeature;
+function matchesAiFeatureType(db) {
+  const { aiFeaturesOnly, traditionalOnly } = state;
+  if (!aiFeaturesOnly && !traditionalOnly) return true;
+
+  if (aiFeaturesOnly && db.aiFeature) return true;
+  if (traditionalOnly && !db.aiFeature) return true;
+  return false;
 }
 
 function getVisibleDatabases() {
@@ -189,7 +196,7 @@ function getVisibleDatabases() {
     (db) => matchesSearch(db)
       && matchesSubjects(db)
       && matchesAccessType(db)
-      && matchesAiFeatures(db),
+      && matchesAiFeatureType(db),
   );
 }
 
@@ -291,9 +298,9 @@ function renderSubjectFilters() {
   const subjects = [...new Set(state.databases.flatMap((db) => db.subjects))].sort();
 
   ui.subjects.innerHTML = subjects.map((subject, index) => `
-    <div class="form-check py-1">
-      <input class="form-check-input" type="checkbox" value="${esc(subject)}" id="sub-${index}"${state.selectedSubjects.has(subject) ? ' checked' : ''}>
-      <label class="form-check-label small" for="sub-${index}">${esc(subject)}</label>
+    <div class="filter-chip-item">
+      <input class="filter-chip-input" type="checkbox" value="${esc(subject)}" id="sub-${index}"${state.selectedSubjects.has(subject) ? ' checked' : ''}>
+      <label class="filter-chip" for="sub-${index}">${esc(subject)}</label>
     </div>`).join('');
 }
 
@@ -338,10 +345,12 @@ function resetFilters() {
   state.librarySupportedOnly = false;
   state.freeResourcesOnly = false;
   state.aiFeaturesOnly = false;
+  state.traditionalOnly = false;
   ui.search.value = '';
   ui.librarySupported.checked = false;
   ui.freeResources.checked = false;
   ui.aiFeatures.checked = false;
+  ui.traditional.checked = false;
   renderAll();
 }
 
@@ -396,7 +405,13 @@ function bindEvents() {
     renderCatalog();
   });
 
+  ui.traditional.addEventListener('change', (event) => {
+    state.traditionalOnly = event.target.checked;
+    renderCatalog();
+  });
+
   ui.reset.addEventListener('click', resetFilters);
+  ui.filterReset?.addEventListener('click', resetFilters);
 
   ui.catalog.addEventListener('click', (event) => {
     const card = event.target.closest('[data-name]');
