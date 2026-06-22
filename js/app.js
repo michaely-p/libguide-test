@@ -4,17 +4,17 @@ const DATA_URL = new URL('data/databases.csv', document.baseURI).href;
 
 /** Display groups: `name` is the canonical title; CSV `function` may use any listed alias. */
 const CATEGORIES = [
-  { name: 'AI Research Tool', color: '#7c6cf0', aliases: ['AI Tools'] },
-  { name: 'Find Book', color: '#38bdf8', aliases: ['Find Book'] },
-  { name: 'Find Article', color: '#3b6fd9', aliases: ['Find Article', 'Find Journal', 'A&I'] },
-  { name: 'Experiment Design', color: '#22c997' },
-  { name: 'Find Standard', color: '#f5a623', aliases: ['Find Standard'] },
-  { name: 'Find Patent', color: '#14b8a6', aliases: ['Find Patent'] },
-  { name: 'Find Theses', color: '#141cb8', aliases: ['Find Theses'] },
-  { name: 'Publisher', color: '#ec4899' },
+  { name: 'AI Research Tool', color: '#5b6f9e', aliases: ['AI Tools'] },
+  { name: 'Find Book', color: '#3f8f8c', aliases: ['Find Book'] },
+  { name: 'Find Article', color: '#4f7fb7', aliases: ['Find Article', 'Find Journal', 'A&I'] },
+  { name: 'Experiment Design', color: '#5f9272' },
+  { name: 'Find Standard', color: '#a8793f', aliases: ['Find Standard'] },
+  { name: 'Find Patent', color: '#3c837f', aliases: ['Find Patent'] },
+  { name: 'Find Theses', color: '#6f6aa8', aliases: ['Find Theses'] },
+  { name: 'Publisher', color: '#a35d7a' },
 ];
 
-const DEFAULT_CATEGORY = { name: 'Other', color: '#94a3b8', order: 99 };
+const DEFAULT_CATEGORY = { name: 'Other', color: '#74808f', order: 99 };
 
 /* ── Category registry (built once from CATEGORIES) ─────────────────── */
 
@@ -47,6 +47,7 @@ const state = {
   freeResourcesOnly: false,
   aiFeaturesOnly: false,
   traditionalOnly: false,
+  viewMode: 'cards',
 };
 
 const ui = {
@@ -62,6 +63,8 @@ const ui = {
   traditional: document.getElementById('traditional'),
   filterReset: document.getElementById('filterReset'),
   reset: document.getElementById('reset'),
+  cardView: document.getElementById('cardView'),
+  tableView: document.getElementById('tableView'),
   detailModal: document.getElementById('detailModal'),
   modalIcon: document.getElementById('modalIcon'),
   modalCat: document.getElementById('modalCat'),
@@ -280,6 +283,52 @@ function renderCategorySection({ category, items }) {
     </div>`;
 }
 
+function renderTableRow(db) {
+  const link = db.url
+    ? `<a class="btn btn-outline-primary btn-sm text-nowrap" href="${esc(db.url)}" target="_blank" rel="noopener">Access Database</a>`
+    : '<span class="text-muted">Not available</span>';
+
+  return `
+    <tr>
+      <td class="catalog-table-name">
+        <button type="button" class="btn btn-link p-0 fw-semibold text-start text-decoration-none" data-name="${esc(db.name)}">
+          ${esc(db.name)}
+        </button>
+      </td>
+      <td class="catalog-table-description">${esc(db.intro || '')}</td>
+      <td class="catalog-table-link">${link}</td>
+    </tr>`;
+}
+
+function renderTableSection({ category, items }) {
+  const { color } = getCategory(category);
+  const textColor = categoryTextColor(color);
+
+  return `
+    <section class="catalog-table-section" style="--cat:${color}">
+      <div class="catalog-table-header d-flex align-items-center justify-content-between gap-2 px-3 py-2" style="background:${color};color:${textColor}">
+        <h2 class="h6 fw-bold mb-0">${esc(category)}</h2>
+        <span class="badge rounded-pill category-card-count" style="background:color-mix(in srgb, ${textColor} 16%, transparent)">${items.length}</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle bg-white mb-0 catalog-table">
+          <thead class="table-light">
+            <tr>
+              <th scope="col">Database Name</th>
+              <th scope="col">Description</th>
+              <th scope="col">Link to Database</th>
+            </tr>
+          </thead>
+          <tbody>${items.map(renderTableRow).join('')}</tbody>
+        </table>
+      </div>
+    </section>`;
+}
+
+function renderTableCatalog(databases) {
+  return groupByCategory(databases).map(renderTableSection).join('');
+}
+
 function replaceBrokenIcon(img) {
   const name = img.closest('[data-name]')?.dataset.name || ui.modalTitle.textContent;
   const db = findDatabase(name);
@@ -304,11 +353,26 @@ function renderSubjectFilters() {
     </div>`).join('');
 }
 
+function updateViewControls() {
+  const isTable = state.viewMode === 'table';
+  ui.cardView.classList.toggle('btn-primary', !isTable);
+  ui.cardView.classList.toggle('btn-outline-primary', isTable);
+  ui.cardView.setAttribute('aria-pressed', String(!isTable));
+  ui.tableView.classList.toggle('btn-primary', isTable);
+  ui.tableView.classList.toggle('btn-outline-primary', !isTable);
+  ui.tableView.setAttribute('aria-pressed', String(isTable));
+}
+
 function renderCatalog() {
   const visible = getVisibleDatabases();
-  const sections = groupByCategory(visible);
 
-  ui.catalog.innerHTML = sections.map(renderCategorySection).join('');
+  updateViewControls();
+  ui.catalog.className = state.viewMode === 'table'
+    ? 'd-flex flex-column gap-3'
+    : 'row row-cols-1 row-cols-sm-2 row-cols-xl-4 g-3';
+  ui.catalog.innerHTML = state.viewMode === 'table'
+    ? renderTableCatalog(visible)
+    : groupByCategory(visible).map(renderCategorySection).join('');
   ui.empty.classList.toggle('d-none', visible.length > 0);
   ui.catalog.classList.toggle('d-none', visible.length === 0);
   ui.status.classList.add('d-none');
@@ -412,6 +476,13 @@ function bindEvents() {
 
   ui.reset.addEventListener('click', resetFilters);
   ui.filterReset?.addEventListener('click', resetFilters);
+
+  [ui.cardView, ui.tableView].forEach((button) => {
+    button.addEventListener('click', () => {
+      state.viewMode = button.dataset.viewMode;
+      renderCatalog();
+    });
+  });
 
   ui.catalog.addEventListener('click', (event) => {
     const card = event.target.closest('[data-name]');

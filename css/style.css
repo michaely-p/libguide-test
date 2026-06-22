@@ -166,6 +166,42 @@
   word-break: break-word;
 }
 
+.catalog-table-section {
+  --cat: #0d6efd;
+  border: 1px solid #e9ecef;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgb(15 23 42 / 6%);
+}
+
+.catalog-table-header {
+  border-bottom: 2px solid color-mix(in srgb, var(--cat) 80%, #000);
+}
+
+.catalog-table {
+  min-width: 760px;
+}
+
+.catalog-table th {
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.catalog-table-name {
+  width: 22%;
+}
+
+.catalog-table-description {
+  width: 58%;
+  line-height: 1.45;
+}
+
+.catalog-table-link {
+  width: 20%;
+}
+
 @media (max-width: 768px) {
   .db-icon { width: 72px; height: 72px; }
   .card .db-icon { width: 56px; height: 56px; }
