@@ -312,13 +312,6 @@ function renderTableSection({ category, items }) {
       </div>
       <div class="table-responsive">
         <table class="table table-sm table-hover align-middle bg-white mb-0 catalog-table">
-          <thead class="table-light">
-            <tr>
-              <th scope="col">Database Name</th>
-              <th scope="col">Description</th>
-              <th scope="col">Link to Database</th>
-            </tr>
-          </thead>
           <tbody>${items.map(renderTableRow).join('')}</tbody>
         </table>
       </div>
