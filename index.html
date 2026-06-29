@@ -9,10 +9,14 @@
 </head>
 <body class="bg-light">
 
-  <main class="container-fluid px-3 px-lg-4 py-3">
+  <main class="container-fluid px-2 px-sm-3 px-lg-4 py-2 py-lg-3">
     <div class="row g-3">
       <aside class="col-lg-2">
         <div class="sticky-lg-top sidebar-sticky">
+          <button type="button" class="btn btn-outline-secondary btn-sm d-lg-none mb-2 w-100" data-bs-toggle="collapse" data-bs-target="#filterCollapse" aria-expanded="false" aria-controls="filterCollapse">
+            Filters
+          </button>
+          <div class="collapse d-lg-block" id="filterCollapse">
           <div class="filter-panel">
             <div class="filter-search input-group input-group-sm">
               <span class="input-group-text bg-white border-end-0">
@@ -61,6 +65,7 @@
               <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none filter-clear-link" id="filterReset">Reset all</button>
             </div>
           </div>
+          </div>
         </div>
       </aside>
 
@@ -82,7 +87,7 @@
   </main>
 
   <div class="modal fade" id="detailModal" tabindex="-1" aria-labelledby="modalTitle" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
       <div class="modal-content border-0 shadow">
         <div class="modal-header border-bottom-0 pb-0">
           <div class="d-flex align-items-center gap-3">

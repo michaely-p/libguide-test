@@ -1,3 +1,9 @@
+html,
+body {
+  width: 100%;
+  min-width: 0;
+}
+
 /* Category cards — color driven via --cat custom property */
 .category-card {
   --cat: #0d6efd;
@@ -202,7 +208,111 @@
   width: 20%;
 }
 
-@media (max-width: 768px) {
-  .db-icon { width: 72px; height: 72px; }
-  .card .db-icon { width: 56px; height: 56px; }
+@media (min-width: 992px) {
+  #filterCollapse {
+    display: block !important;
+    height: auto !important;
+    visibility: visible;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .category-card-body {
+    padding: 0.5rem !important;
+  }
+
+  .db-card-item {
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 0.75rem;
+    text-align: left;
+    padding: 0.5rem 0.25rem;
+  }
+
+  .db-card-item .db-icon {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    font-size: 0.75rem;
+  }
+
+  .db-card-item .db-title {
+    font-size: 0.875rem;
+    text-align: left;
+  }
+
+  .filter-group-label {
+    font-size: 0.6875rem;
+  }
+
+  .filter-chip {
+    font-size: 0.75rem;
+  }
+
+  .filter-search .form-control,
+  .filter-search .input-group-text {
+    font-size: 0.875rem;
+  }
+
+  .catalog-table-section .table-responsive {
+    overflow-x: visible;
+  }
+
+  .catalog-table {
+    min-width: 0;
+  }
+
+  .catalog-table tbody,
+  .catalog-table tr,
+  .catalog-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .catalog-table tr {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #eef1f4;
+  }
+
+  .catalog-table tr:last-child {
+    border-bottom: 0;
+  }
+
+  .catalog-table td {
+    padding: 0.25rem 0;
+    border: 0;
+  }
+
+  .catalog-table td::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 0.125rem;
+  }
+
+  .catalog-table-name::before,
+  .catalog-table-link::before {
+    margin-bottom: 0.25rem;
+  }
+
+  .catalog-table-description {
+    font-size: 0.875rem;
+    line-height: 1.6;
+    margin-bottom: 0.5rem;
+  }
+
+  .catalog-table-link .btn {
+    white-space: normal;
+  }
+}
+
+@media (max-width: 575.98px) {
+  #modalIntro {
+    font-size: 1rem;
+    line-height: 1.65;
+  }
 }

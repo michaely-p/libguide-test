@@ -1,11 +1,25 @@
 /* ── Config ─────────────────────────────────────────────────────────── */
 
-const DATA_URL = new URL('data/databases.csv', document.baseURI).href;
+function getAssetBase() {
+  const scriptSrc = document.currentScript?.src
+    || document.querySelector('script[src*="app.js"]')?.src;
+  if (scriptSrc && !scriptSrc.startsWith('blob:')) {
+    return new URL('../', scriptSrc).href;
+  }
+
+  const metaBase = document.querySelector('meta[name="asset-base"]')?.content?.trim();
+  if (metaBase) return new URL(metaBase, document.baseURI).href;
+
+  return document.baseURI;
+}
+
+const ASSET_BASE = getAssetBase();
+const DATA_URL = new URL('data/databases.csv', ASSET_BASE).href;
 
 /** Display groups: `name` is the canonical title; CSV `function` may use any listed alias. */
 const CATEGORIES = [
   { name: 'AI Research Tool', color: '#5b6f9e', aliases: ['AI Tools'] },
-  { name: 'Find Book', color: '#3f8f8c', aliases: ['Find Book'] },
+  { name: 'Library Resource', color: '#3f8f8c', aliases: ['Library Resource'] },
   { name: 'Find Article', color: '#4f7fb7', aliases: ['Find Article', 'Find Journal', 'A&I'] },
   { name: 'Experiment Design', color: '#5f9272' },
   { name: 'Find Standard', color: '#a8793f', aliases: ['Find Standard'] },
@@ -84,9 +98,11 @@ const esc = (value) => String(value)
 
 const resolveAssetUrl = (path) => (
   path && !/^https?:\/\//i.test(path)
-    ? new URL(path.replace(/^\//, ''), document.baseURI).href
+    ? new URL(path.replace(/^\//, ''), ASSET_BASE).href
     : path
 );
+
+const csvFlag = (value) => String(value ?? '').trim().toLowerCase() === 'y';
 
 /* ── CSV parsing ────────────────────────────────────────────────────── */
 
@@ -135,14 +151,14 @@ function rowToDatabase(headers, values) {
 
   return {
     name,
-    intro: record.intro,
-    type: record['database type'],
-    subjects: record['related subjects'].split('|').map((s) => s.trim()).filter(Boolean),
-    url: record['access url'],
+    intro: record.intro ?? '',
+    type: record['database type'] ?? '',
+    subjects: (record['related subjects'] ?? '').split('|').map((s) => s.trim()).filter(Boolean),
+    url: record['access url'] ?? '',
     category: normalizeCategory(record.function),
     img: resolveAssetUrl(record.img),
-    openResource: record.open_resource.trim().toLowerCase() === 'y',
-    aiFeature: record.ai_feature.trim().toLowerCase() === 'y',
+    openResource: csvFlag(record.open_resource),
+    aiFeature: csvFlag(record.ai_feature),
     sort: Number.isFinite(sort) ? sort : 999,
   };
 }
@@ -256,7 +272,7 @@ function categoryTextColor(hex) {
 function renderDatabaseCard(db) {
   return `
     <div class="col">
-      <button type="button" class="btn border-0 bg-transparent d-flex flex-column align-items-center gap-1 py-1 px-1 w-100" data-name="${esc(db.name)}">
+      <button type="button" class="btn border-0 bg-transparent db-card-item d-flex flex-row flex-md-column align-items-center gap-1 py-1 px-1 w-100" data-name="${esc(db.name)}">
         ${renderIcon(db)}
         <span class="fw-semibold text-center lh-sm text-break db-title w-100">${esc(db.name)}</span>
       </button>
@@ -275,7 +291,7 @@ function renderCategorySection({ category, items }) {
           <span class="badge rounded-pill category-card-count" style="background:color-mix(in srgb, ${textColor} 16%, transparent)">${items.length}</span>
         </div>
         <div class="card-body p-2 category-card-body">
-          <div class="row row-cols-3 g-1">
+          <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-2">
             ${items.map(renderDatabaseCard).join('')}
           </div>
         </div>
@@ -490,9 +506,15 @@ function bindEvents() {
 async function init() {
   try {
     await loadDatabases();
-    renderAll();
   } catch (error) {
     showLoadError(`Failed to load data: ${error.message}`);
+    return;
+  }
+
+  try {
+    renderAll();
+  } catch (error) {
+    showLoadError(`Failed to display data: ${error.message}`);
   }
 }
 
