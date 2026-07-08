@@ -22,47 +22,55 @@ const CATEGORIES = [
     name: 'AI Research Tool',
     color: '#5b6f9e',
     aliases: ['AI Tools'],
-    description: 'Tools and platforms that help you search, summarise, and prototype AI-enabled research workflows.'
+    description: 'AI platforms that help your research.',
+    guideHref: '',
   },
   {
     name: 'Library Resource',
     color: '#3f8f8c',
     aliases: ['Library Resource'],
-    description: 'Library-supported resources for finding and accessing scholarly materials with PolyU Library services.'
+    description: 'Search engine for accessing scholarly materials in PolyU Library.',
+    guideHref: '',
   },
   {
     name: 'Find Article',
     color: '#4f7fb7',
     aliases: ['Find Article', 'Find Journal', 'A&I'],
-    description: 'Databases to discover journal articles, indexing and abstracting services, and citation-based searching.'
+    description: 'Databases to discover journal articles.',
+    guideHref: 'https://libguides.lb.polyu.edu.hk/c.php?g=521255&p=3564303',
   },
   {
     name: 'Experiment Design',
     color: '#5f9272',
-    description: 'Practical resources for experiment planning, methods design, and research support materials.'
+    description: 'Practical resources for experiment planning and methods design.',
+    guideHref: '',
   },
   {
     name: 'Find Standard',
     color: '#a8793f',
     aliases: ['Find Standard'],
-    description: 'Standards and technical specifications for aligning your work with recognised guidelines.'
+    description: 'Standards and technical specifications for your research.',
+    guideHref: 'https://libguides.lb.polyu.edu.hk/c.php?g=521255&p=6596063',
   },
   {
     name: 'Find Patent',
     color: '#3c837f',
     aliases: ['Find Patent'],
-    description: 'Patent databases for searching inventions, legal status, and related technical disclosures.'
+    description: 'Patent databases for searching inventions and their legal status.',
+    guideHref: '',
   },
   {
     name: 'Find Theses',
     color: '#6f6aa8',
     aliases: ['Find Theses'],
-    description: 'Thesis and dissertation databases to locate previous research and deepen your background reading.'
+    description: 'Locate research thesis and dissertation.',
+    guideHref: 'https://libguides.lb.polyu.edu.hk/c.php?g=521255&p=7187782',
   },
   {
     name: 'Publisher',
     color: '#a35d7a',
-    description: 'Publisher platforms and aggregators for browsing journals, collections, and content from specific publishers.'
+    description: 'Browse collections from specific publishers.',
+    guideHref: '',
   },
 ];
 
@@ -71,6 +79,7 @@ const DEFAULT_CATEGORY = {
   color: '#74808f',
   order: 99,
   description: '',
+  guideHref: '',
 };
 
 /* ── Category registry (built once from CATEGORIES) ─────────────────── */
@@ -78,8 +87,8 @@ const DEFAULT_CATEGORY = {
 const categoryLookup = new Map();
 const categoryMeta = new Map();
 
-CATEGORIES.forEach(({ name, color, aliases = [], description = '' }, order) => {
-  categoryMeta.set(name, { name, color, order, description });
+CATEGORIES.forEach(({ name, color, aliases = [], description = '', guideHref = '' }, order) => {
+  categoryMeta.set(name, { name, color, order, description, guideHref });
   categoryLookup.set(name, name);
   aliases.forEach((alias) => categoryLookup.set(alias, name));
 });
@@ -323,7 +332,7 @@ function renderDatabaseCard(db) {
 }
 
 function renderCategorySection({ category, items }) {
-  const { color, description = '' } = getCategory(category);
+  const { color, description = '', guideHref = '' } = getCategory(category);
   const textColor = categoryTextColor(color);
 
   return `
@@ -331,8 +340,10 @@ function renderCategorySection({ category, items }) {
       <section class="card category-card h-100 border-0 overflow-hidden" style="--cat:${color}">
         <div class="category-card-header px-3 py-2" style="background:${color};color:${textColor}">
           <div class="d-flex align-items-center justify-content-between gap-2">
-            <h2 class="h6 fw-bold mb-0">${esc(category)}</h2>
-            <span class="badge rounded-pill category-card-count" style="background:color-mix(in srgb, ${textColor} 16%, transparent)">${items.length}</span>
+            <div class="d-flex align-items-center gap-2">
+              <h2 class="h6 fw-bold mb-0">${esc(category)}</h2>
+              ${guideHref ? `<a class="category-guide-link" href="${esc(guideHref)}" target="_blank" rel="noopener noreferrer">Guide</a>` : ''}
+            </div>
           </div>
           ${description ? `<p class="category-card-desc mb-0">${esc(description)}</p>` : ''}
         </div>
@@ -363,15 +374,17 @@ function renderTableRow(db) {
 }
 
 function renderTableSection({ category, items }) {
-  const { color, description = '' } = getCategory(category);
+  const { color, description = '', guideHref = '' } = getCategory(category);
   const textColor = categoryTextColor(color);
 
   return `
     <section class="catalog-table-section" style="--cat:${color}">
       <div class="catalog-table-header px-3 py-2" style="background:${color};color:${textColor}">
         <div class="d-flex align-items-center justify-content-between gap-2">
-          <h2 class="h6 fw-bold mb-0">${esc(category)}</h2>
-          <span class="badge rounded-pill category-card-count" style="background:color-mix(in srgb, ${textColor} 16%, transparent)">${items.length}</span>
+          <div class="d-flex align-items-center gap-2">
+            <h2 class="h6 fw-bold mb-0">${esc(category)}</h2>
+            ${guideHref ? `<a class="category-guide-link" href="${esc(guideHref)}" target="_blank" rel="noopener noreferrer">Guide</a>` : ''}
+          </div>
         </div>
         ${description ? `<p class="category-table-desc mb-0">${esc(description)}</p>` : ''}
       </div>
