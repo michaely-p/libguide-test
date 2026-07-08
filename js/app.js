@@ -18,25 +18,68 @@ const DATA_URL = new URL('data/databases.csv', ASSET_BASE).href;
 
 /** Display groups: `name` is the canonical title; CSV `function` may use any listed alias. */
 const CATEGORIES = [
-  { name: 'AI Research Tool', color: '#5b6f9e', aliases: ['AI Tools'] },
-  { name: 'Library Resource', color: '#3f8f8c', aliases: ['Library Resource'] },
-  { name: 'Find Article', color: '#4f7fb7', aliases: ['Find Article', 'Find Journal', 'A&I'] },
-  { name: 'Experiment Design', color: '#5f9272' },
-  { name: 'Find Standard', color: '#a8793f', aliases: ['Find Standard'] },
-  { name: 'Find Patent', color: '#3c837f', aliases: ['Find Patent'] },
-  { name: 'Find Theses', color: '#6f6aa8', aliases: ['Find Theses'] },
-  { name: 'Publisher', color: '#a35d7a' },
+  {
+    name: 'AI Research Tool',
+    color: '#5b6f9e',
+    aliases: ['AI Tools'],
+    description: 'Tools and platforms that help you search, summarise, and prototype AI-enabled research workflows.'
+  },
+  {
+    name: 'Library Resource',
+    color: '#3f8f8c',
+    aliases: ['Library Resource'],
+    description: 'Library-supported resources for finding and accessing scholarly materials with PolyU Library services.'
+  },
+  {
+    name: 'Find Article',
+    color: '#4f7fb7',
+    aliases: ['Find Article', 'Find Journal', 'A&I'],
+    description: 'Databases to discover journal articles, indexing and abstracting services, and citation-based searching.'
+  },
+  {
+    name: 'Experiment Design',
+    color: '#5f9272',
+    description: 'Practical resources for experiment planning, methods design, and research support materials.'
+  },
+  {
+    name: 'Find Standard',
+    color: '#a8793f',
+    aliases: ['Find Standard'],
+    description: 'Standards and technical specifications for aligning your work with recognised guidelines.'
+  },
+  {
+    name: 'Find Patent',
+    color: '#3c837f',
+    aliases: ['Find Patent'],
+    description: 'Patent databases for searching inventions, legal status, and related technical disclosures.'
+  },
+  {
+    name: 'Find Theses',
+    color: '#6f6aa8',
+    aliases: ['Find Theses'],
+    description: 'Thesis and dissertation databases to locate previous research and deepen your background reading.'
+  },
+  {
+    name: 'Publisher',
+    color: '#a35d7a',
+    description: 'Publisher platforms and aggregators for browsing journals, collections, and content from specific publishers.'
+  },
 ];
 
-const DEFAULT_CATEGORY = { name: 'Other', color: '#74808f', order: 99 };
+const DEFAULT_CATEGORY = {
+  name: 'Other',
+  color: '#74808f',
+  order: 99,
+  description: '',
+};
 
 /* ── Category registry (built once from CATEGORIES) ─────────────────── */
 
 const categoryLookup = new Map();
 const categoryMeta = new Map();
 
-CATEGORIES.forEach(({ name, color, aliases = [] }, order) => {
-  categoryMeta.set(name, { name, color, order });
+CATEGORIES.forEach(({ name, color, aliases = [], description = '' }, order) => {
+  categoryMeta.set(name, { name, color, order, description });
   categoryLookup.set(name, name);
   aliases.forEach((alias) => categoryLookup.set(alias, name));
 });
@@ -280,15 +323,18 @@ function renderDatabaseCard(db) {
 }
 
 function renderCategorySection({ category, items }) {
-  const { color } = getCategory(category);
+  const { color, description = '' } = getCategory(category);
   const textColor = categoryTextColor(color);
 
   return `
     <div class="col">
       <section class="card category-card h-100 border-0 overflow-hidden" style="--cat:${color}">
-        <div class="category-card-header d-flex align-items-center justify-content-between gap-2 px-3 py-2" style="background:${color};color:${textColor}">
-          <h2 class="h6 fw-bold mb-0">${esc(category)}</h2>
-          <span class="badge rounded-pill category-card-count" style="background:color-mix(in srgb, ${textColor} 16%, transparent)">${items.length}</span>
+        <div class="category-card-header px-3 py-2" style="background:${color};color:${textColor}">
+          <div class="d-flex align-items-center justify-content-between gap-2">
+            <h2 class="h6 fw-bold mb-0">${esc(category)}</h2>
+            <span class="badge rounded-pill category-card-count" style="background:color-mix(in srgb, ${textColor} 16%, transparent)">${items.length}</span>
+          </div>
+          ${description ? `<p class="category-card-desc mb-0">${esc(description)}</p>` : ''}
         </div>
         <div class="card-body p-2 category-card-body">
           <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-2">
@@ -317,14 +363,17 @@ function renderTableRow(db) {
 }
 
 function renderTableSection({ category, items }) {
-  const { color } = getCategory(category);
+  const { color, description = '' } = getCategory(category);
   const textColor = categoryTextColor(color);
 
   return `
     <section class="catalog-table-section" style="--cat:${color}">
-      <div class="catalog-table-header d-flex align-items-center justify-content-between gap-2 px-3 py-2" style="background:${color};color:${textColor}">
-        <h2 class="h6 fw-bold mb-0">${esc(category)}</h2>
-        <span class="badge rounded-pill category-card-count" style="background:color-mix(in srgb, ${textColor} 16%, transparent)">${items.length}</span>
+      <div class="catalog-table-header px-3 py-2" style="background:${color};color:${textColor}">
+        <div class="d-flex align-items-center justify-content-between gap-2">
+          <h2 class="h6 fw-bold mb-0">${esc(category)}</h2>
+          <span class="badge rounded-pill category-card-count" style="background:color-mix(in srgb, ${textColor} 16%, transparent)">${items.length}</span>
+        </div>
+        ${description ? `<p class="category-table-desc mb-0">${esc(description)}</p>` : ''}
       </div>
       <div class="table-responsive">
         <table class="table table-sm table-hover align-middle bg-white mb-0 catalog-table">

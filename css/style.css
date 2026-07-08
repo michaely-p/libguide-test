@@ -20,6 +20,19 @@ body {
   color: inherit;
 }
 
+.category-card-desc,
+.category-table-desc {
+  font-size: 0.7rem;
+  line-height: 1.35;
+  color: inherit;
+  opacity: 0.95;
+  margin: 0.35rem 0 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
 .category-card-body {
   background: color-mix(in srgb, var(--cat) 9%, #fff);
 }
@@ -219,6 +232,13 @@ body {
 @media (max-width: 767.98px) {
   .category-card-body {
     padding: 0.5rem !important;
+  }
+
+  .category-card-desc,
+  .category-table-desc {
+    font-size: 0.65rem;
+    margin-top: 0.25rem;
+    -webkit-line-clamp: 1;
   }
 
   .db-card-item {
